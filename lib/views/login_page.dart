@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:green_bin/utils/app_colors.dart';
-
+import 'package:green_bin/views/otp_page.dart';
 class login_page extends StatefulWidget {
   const login_page({super.key});
 
@@ -14,67 +14,33 @@ class _login_pageState extends State<login_page> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-          backgroundColor: Colors.white,
+          backgroundColor:White,
       body: SafeArea(
         child: Column(
           children: [
             // Top green design
-            Expanded(
-          flex: 4,
-          child: Stack(
-            children: [
-Container(
+            SizedBox(
+              height: MediaQuery.of(context).size.height * 0.5,
               width: double.infinity,
-            decoration: const BoxDecoration(
-              color: CardGreen,
-              borderRadius: BorderRadius.only(
-                bottomLeft: Radius.circular(100),
-                bottomRight: Radius.circular(100),
-              ),
-            ),
-          ),
-                // curved stripe design
-            Positioned(
-              top: 50,
-              left: -80,
-              child: Transform.rotate(
-                  angle: -0.35,
-              child: Container(
-                  width: 500,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-              ),),
-            ),
-          Positioned(
-            top: 180,
-            left: -120,
-            child: Transform.rotate(
-              angle: -0.35,
-              child: Container(
-                width: 500,
-                height: 70,
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(50),
-                ),
-              ),
-            ),
-          ),
-//App logo
-            const Center(
-              child: Text('G',
-              style: TextStyle(color: Colors.white,
-              fontSize: 110,
-              fontWeight: FontWeight.w900,
-              height: 1,),
-              ),
-            ),
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
 
-        ],
-          ),
+                  Positioned.fill(
+                    child: Image.asset(
+                      "assets/login_curve.png",
+                      fit: BoxFit.fill,
+                    ),
+                  ),
+
+                  Image.asset(
+                    "assets/G.png",
+                    width: 110,
+                    height: 110,
+                  ),
+
+                ],
+              ),
             ),
             //Login
             Expanded(
@@ -94,11 +60,11 @@ Container(
 
                     ),
                     const SizedBox(height: 8,),
-                      const Text('Login to schedule waste pickup',
+                      const Text('Login to schedule waste pickups',
                       style: TextStyle(
                         color:Colors.black ,
                         fontSize: 15,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w400,
                         height: 1.4,
 
                       ),
@@ -121,20 +87,20 @@ Container(
                          color: Colors.grey,
                          fontSize: 14,
                    ),
-                       prefixIcon: const Icon(Icons.phone,color: Colors.grey,size: 20,),
+                       prefixIcon: const Icon(Icons.phone,color:CardGreen,size: 20,),
                        contentPadding: const EdgeInsets.symmetric(vertical: 10,horizontal: 20,
                        ),
                        enabledBorder: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(10),
+                         borderRadius: BorderRadius.circular(16),
                          borderSide: const BorderSide(
-                           color: Colors.grey,
+                           color: Green,
                            width: 1,
                          ),
                        ),
                        focusedBorder: OutlineInputBorder(
-                         borderRadius: BorderRadius.circular(10),
+                         borderRadius: BorderRadius.circular(16),
                          borderSide: const BorderSide(
-                           color: Colors.grey,
+                           color: Green,
                            width: 1,
                          ),
                        ),
@@ -146,7 +112,8 @@ Container(
                       height: 50,
                       child: ElevatedButton(
                         onPressed: () {
-
+                         Navigator.push(context, MaterialPageRoute(builder: (context) =>OtpPage(),
+                         ),);
                           // Handle login button press
                         },
                         style: ElevatedButton.styleFrom(
@@ -161,6 +128,7 @@ Container(
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
+
                           ),
                         ),
                       ),

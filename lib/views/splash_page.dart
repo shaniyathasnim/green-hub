@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:green_bin/views/home_page.dart';
-
+import 'package:green_bin/views/login_page.dart';
 class SplashPage extends StatefulWidget {
   const SplashPage({super.key});
 
@@ -31,7 +31,7 @@ with SingleTickerProviderStateMixin {
     Timer(const Duration(seconds: 4), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomePage(),
+        MaterialPageRoute(builder: (context) =>login_page(),
         ),
       );
     });
