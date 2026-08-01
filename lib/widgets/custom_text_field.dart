@@ -26,8 +26,8 @@ class CustomTextField extends StatelessWidget {
           label,
           style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w600,
-            color: Grey,
+            fontWeight: FontWeight.w400,
+            color: Black,
           ),
         ),
         const SizedBox(height: 8),
@@ -39,7 +39,7 @@ class CustomTextField extends StatelessWidget {
             hintText: hint,
             prefixIcon: prefixIcon,
             filled: true,
-            fillColor: LightGrey,
+            fillColor:LightGrey,
 
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),

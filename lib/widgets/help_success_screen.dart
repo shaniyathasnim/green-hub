@@ -11,15 +11,15 @@ class HelpSuccessScreen extends StatelessWidget {
       backgroundColor: White,
       body: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24.0),
+            padding: const EdgeInsets.symmetric(horizontal: 30),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
               // Success Image
               Image.asset(
               "assets/complaint_submit.gif",
-              width: 300,
-              height:300,
+              width: 200,
+              height:200,
               fit: BoxFit.contain,
             ),
             const SizedBox(height: 20),

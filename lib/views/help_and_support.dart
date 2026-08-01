@@ -92,7 +92,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               'How Can We Help You Today?',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w200,
                 color: Grey,
               ),
             ),
@@ -101,7 +101,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               'Please Select An Issue Type Below.',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.bold,
+                fontWeight:FontWeight.w200,
                 color: Grey,
               ),
             ),
