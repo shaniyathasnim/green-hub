@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:green_bin/views/profile_page.dart';
 
 import '../utils/app_colors.dart';
 import 'image_edit_sceen.dart';
@@ -9,11 +10,6 @@ import 'image_edit_sceen.dart';
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
 
-  // static const Color kPrimaryGreen = Color(0xFF1B7A4D);
-  // static const Color kDarkText = Color(0xFF1E2A26);
-  // static const Color kSubText = Color(0xFF6B7975);
-  // static const Color kFieldBg = Color(0xFFF3F6F5);
-  // static const Color kFieldBorder = Color(0xFFE3E8E6);
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
@@ -24,6 +20,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   TextEditingController(text: 'Arun');
   final TextEditingController _contactController =
   TextEditingController(text: '+91 000 000 000 0');
+  final TextEditingController _passwordController =
+      TextEditingController(text: '******');
   final TextEditingController _addressController =
   TextEditingController(text: '20th Mile, Perinthalmanna');
 
@@ -32,6 +30,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nameController.dispose();
     _contactController.dispose();
     _addressController.dispose();
+    _passwordController.dispose();
     super.dispose();
   }
 
@@ -65,6 +64,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                       controller: _contactController,
                       icon: Icons.call_outlined,
                       keyboardType: TextInputType.phone,
+                    ),
+                    const SizedBox(height: 18),
+                    _buildLabel('Password'),
+                    const SizedBox(height: 8),
+                    _buildField(
+                      controller: _passwordController,
+                      icon: Icons.password,
+                      keyboardType: TextInputType.visiblePassword,
                     ),
                     const SizedBox(height: 18),
                     _buildLabel('Home Address'),
@@ -122,7 +129,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         children: [
           const CircleAvatar(
             radius: 46,
-            backgroundColor: Color(0xFFEFEFEF),
+            backgroundColor: White,
             // Replace with NetworkImage/AssetImage of the user's photo
             backgroundImage: AssetImage(
               'assets/profile_image.png',
@@ -202,9 +209,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Container(
       height: 50,
       decoration: BoxDecoration(
-        color: White,
+        color: LightGrey,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: White, width: 1),
+        border: Border.all(color:DarkGrey, width: 1),
       ),
       child: Row(
         children: [
@@ -220,7 +227,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               controller: controller,
               keyboardType: keyboardType,
               style: const TextStyle(
-                color: Black,
+                color: Grey,
                 fontSize: 14.5,
                 fontWeight: FontWeight.w500,
               ),
@@ -246,6 +253,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         height: 52,
         child: ElevatedButton(
           onPressed: () {
+            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
             // TODO: handle update action
           },
           style: ElevatedButton.styleFrom(

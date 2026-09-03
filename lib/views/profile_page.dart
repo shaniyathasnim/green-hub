@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:green_bin/utils/app_colors.dart';
 
+import 'edit_profile_screen.dart';
+
 /// ProfileScreen
 /// Pixel-perfect recreation of the "My Profile" screen.
 /// Bottom navigation bar is intentionally excluded (already implemented elsewhere).
@@ -24,7 +26,7 @@ class ProfileScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(),
+              _buildHeader(context),
               _buildPersonalDetails(),
             ],
           ),
@@ -34,7 +36,7 @@ class ProfileScreen extends StatelessWidget {
   }
 
   // ---------------- HEADER ----------------
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.only(top: 12, bottom: 28),
@@ -56,7 +58,7 @@ class ProfileScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          _buildAvatar(),
+          _buildAvatar(context),
           const SizedBox(height: 14),
           const Text(
             'Arun',
@@ -80,7 +82,7 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildAvatar() {
+  Widget _buildAvatar(BuildContext context) {
     return SizedBox(
       width: 108,
       height: 108,
@@ -107,7 +109,15 @@ class ProfileScreen extends StatelessWidget {
           Positioned(
             right: 2,
             bottom: 2,
-            child: Container(
+            child: InkWell(
+              onTap: (){
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const EditProfileScreen()),
+                );
+              },
+              borderRadius: BorderRadius.circular(20),
+              child: Container(
               width: 30,
               height: 30,
               decoration: BoxDecoration(
@@ -119,8 +129,10 @@ class ProfileScreen extends StatelessWidget {
                 Icons.edit,
                 color: Colors.white,
                 size: 14,
+
               ),
             ),
+          ),
           ),
         ],
       ),
@@ -153,6 +165,12 @@ class ProfileScreen extends StatelessWidget {
             icon: Icons.call_outlined,
             label: 'Mobile Number',
             value: '+91 000 000 000 0',
+          ),
+          const SizedBox(height: 14),
+          _InfoCard(
+            icon: Icons.password,
+            label: 'Password',
+            value: '******',
           ),
           const SizedBox(height: 14),
           _InfoCard(

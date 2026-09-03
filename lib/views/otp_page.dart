@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:green_bin/utils/app_colors.dart';
 import 'package:green_bin/views/home_page.dart';
+import 'package:green_bin/views/edit_profile_screen.dart';
+import 'package:green_bin/providers/customer_provider.dart';
 
 class OtpPage extends StatefulWidget {
-  const OtpPage({super.key});
+  final String phone;
+  const OtpPage({super.key, required this.phone,});
 
   @override
   State<OtpPage> createState() => _OtpPageState();
@@ -12,21 +16,28 @@ class OtpPage extends StatefulWidget {
 class _OtpPageState extends State<OtpPage> {
   final List<TextEditingController> controllers =
   List.generate(4, (_) => TextEditingController());
+  final List<FocusNode> focusNodes =
+  List.generate(4, (_) => FocusNode());
 
+  @override
   @override
   void dispose() {
     for (var controller in controllers) {
       controller.dispose();
     }
+    for (var node in focusNodes) {
+      node.dispose();
+    }
     super.dispose();
   }
 
-  Widget otpBox(TextEditingController controller) {
+  Widget otpBox(int index) {
     return SizedBox(
       width: 55,
       height: 60,
       child: TextField(
-        controller: controller,
+        controller: controllers[index],
+        focusNode: focusNodes[index],
         keyboardType: TextInputType.number,
         textAlign: TextAlign.center,
         maxLength: 1,
@@ -38,9 +49,7 @@ class _OtpPageState extends State<OtpPage> {
           counterText: "",
           enabledBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
-            borderSide: const BorderSide(
-              color: CardGreen,
-            ),
+            borderSide: const BorderSide(color: CardGreen),
           ),
           focusedBorder: OutlineInputBorder(
             borderRadius: BorderRadius.circular(10),
@@ -50,25 +59,60 @@ class _OtpPageState extends State<OtpPage> {
             ),
           ),
         ),
+        onChanged: (value) {
+          if (value.isNotEmpty) {
+            if (index < focusNodes.length - 1) {
+              FocusScope.of(context).requestFocus(focusNodes[index + 1]);
+            } else {
+              FocusScope.of(context).unfocus();
+            }
+          } else {
+            if (index > 0) {
+              FocusScope.of(context).requestFocus(focusNodes[index - 1]);
+            }
+          }
+        },
       ),
     );
   }
 
-  void _verifyOtp() {
+  void _verifyOtp() async {
     String otp = controllers.map((e) => e.text).join();
+    if (otp.length < 4) return;
 
-    debugPrint("OTP : $otp");
+    final provider = Provider.of<CustomerProvider>(context, listen: false);
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => const HomePage(),
-      ),
-    );
+    try {
+      await provider.verifyOtp(otp);
+      
+      if (!mounted) return;
+
+      if (provider.isNewUser) {
+        // Navigate to Profile Registration if new user
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+          (route) => false,
+        );
+      } else {
+        // Go to Home if existing user
+        Navigator.pushAndRemoveUntil(
+          context,
+          MaterialPageRoute(builder: (_) => const HomePage()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Invalid OTP: $e")),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<CustomerProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: White,
       resizeToAvoidBottomInset: true,
@@ -86,7 +130,6 @@ class _OtpPageState extends State<OtpPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 20),
-
                 Center(
                   child: Image.asset(
                     "assets/otp.gif",
@@ -94,9 +137,7 @@ class _OtpPageState extends State<OtpPage> {
                     fit: BoxFit.contain,
                   ),
                 ),
-
                 const SizedBox(height: 30),
-
                 const Text(
                   "Verify OTP",
                   style: TextStyle(
@@ -105,37 +146,31 @@ class _OtpPageState extends State<OtpPage> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-
                 const SizedBox(height: 10),
-
-                const Text(
-                  "Enter the 4 digit code sent to your mobile number",
-                  style: TextStyle(
+                Text(
+                  "Enter the 4 digit code sent to ${widget.phone}",
+                  style: const TextStyle(
                     color: Black,
                     fontSize: 15,
                     height: 1.4,
                   ),
                 ),
-
                 const SizedBox(height: 35),
-
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
-                    otpBox(controllers[0]),
-                    otpBox(controllers[1]),
-                    otpBox(controllers[2]),
-                    otpBox(controllers[3]),
+                    otpBox(0),
+                    otpBox(1),
+                    otpBox(2),
+                    otpBox(3),
                   ],
                 ),
-
                 const SizedBox(height: 40),
-
                 SizedBox(
                   width: double.infinity,
                   height: 54,
                   child: ElevatedButton(
-                    onPressed: _verifyOtp,
+                    onPressed: isLoading ? null : _verifyOtp,
                     style: ElevatedButton.styleFrom(
                       backgroundColor: CardGreen,
                       elevation: 0,
@@ -143,23 +178,23 @@ class _OtpPageState extends State<OtpPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    child: const Text(
-                      "Verify",
-                      style: TextStyle(
-                        color: White,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: isLoading 
+                      ? const CircularProgressIndicator(color: White)
+                      : const Text(
+                          "Verify",
+                          style: TextStyle(
+                            color: White,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
                 Center(
                   child: TextButton(
                     onPressed: () {
-                      // Resend OTP
+                      // Logic to resend OTP
                     },
                     child: const Text(
                       "Resend OTP?",
@@ -171,7 +206,6 @@ class _OtpPageState extends State<OtpPage> {
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
               ],
             ),
