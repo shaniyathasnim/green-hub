@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "771713067940",
+    "project_id": "green-bin-customer-92130",
+    "storage_bucket": "green-bin-customer-92130.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771713067940:android:41055cb1459053d93e2f31",
+        "android_client_info": {
+          "package_name": "com.example.green_bin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAb4dzI-XwgZFfVaA7cmed9pu3pj8a5HZc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
