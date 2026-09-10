@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:green_bin/providers/customer_provider.dart';
 import 'package:green_bin/views/splash_page.dart';
+import 'package:green_bin/utils/shared_prefs.dart';
 
 import 'firebase_options.dart';
 
@@ -12,6 +13,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+  await SharedPrefs.init();
   runApp(
     MultiProvider(
       providers: [
@@ -39,3 +41,4 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+

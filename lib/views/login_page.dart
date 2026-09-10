@@ -1,7 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:green_bin/utils/app_colors.dart';
-import 'package:green_bin/views/register_screen.dart';
+import 'dart:developer';
 
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:green_bin/utils/app_colors.dart';
+import 'package:green_bin/views/register_screen.dart' hide CustomerProvider;
+import 'package:green_bin/providers/customer_provider.dart';
+import 'package:green_bin/utils/shared_prefs.dart';
 import 'home_page.dart';
 
 class login_page extends StatefulWidget {
@@ -18,7 +22,6 @@ class _login_pageState extends State<login_page> {
   final TextEditingController _passwordController = TextEditingController();
 
   bool _obscurePassword = true;
-  bool _isLoading = false;
 
   @override
   void dispose() {
@@ -27,30 +30,52 @@ class _login_pageState extends State<login_page> {
     super.dispose();
   }
 
-  void _handleLogin() {
+  Future<void> _handleLogin() async {
     if (_formKey.currentState!.validate()) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomePage()),
-      );
-      final email = _emailController.text.trim();
-      final password = _passwordController.text.trim();
-
-      print("Email: $email");
-      print("Password: $password");
-
-      // Firebase login logic will be added here
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Login successful"),
-        ),
-      );
+      return;
     }
-  }
+      final provider = Provider.of<CustomerProvider>(
+          context,
+          listen: false);
+      
+      try {
+        await provider.loginWithEmail(
+          _emailController.text.trim(),
+          _passwordController.text.trim(),
+        );
+        if (!mounted) return;
+        if (provider.customer != null) {
+          // Save to Shared Preferences
+           await SharedPrefs.setUser(provider.customer!);
 
-  @override
+          if (!mounted) return;
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Login successful"),
+                backgroundColor: Colors.green),
+          );
+
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+                builder: (context) => const HomePage()
+            ),
+          );
+        }
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()),
+              backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+
+    @override
   Widget build(BuildContext context) {
+    final isLoading = context.watch<CustomerProvider>().isLoading;
+
     return Scaffold(
       backgroundColor: White,
       body: SafeArea(
@@ -59,7 +84,6 @@ class _login_pageState extends State<login_page> {
             key: _formKey,
             child: Column(
               children: [
-
                 // Top green design
                 SizedBox(
                   height: MediaQuery.of(context).size.height * 0.38,
@@ -73,7 +97,6 @@ class _login_pageState extends State<login_page> {
                           fit: BoxFit.fill,
                         ),
                       ),
-
                       Image.asset(
                         "assets/G.png",
                         width: 110,
@@ -84,15 +107,10 @@ class _login_pageState extends State<login_page> {
                 ),
 
                 Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 28,
-                    vertical: 26,
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 26),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-
-                      // Welcome
                       const Text(
                         "Welcome",
                         style: TextStyle(
@@ -101,11 +119,9 @@ class _login_pageState extends State<login_page> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 6),
-
                       const Text(
-                        "Login to schedule waste pickups",
+                        "Login to registor customer.",
                         style: TextStyle(
                           color: Colors.black,
                           fontSize: 15,
@@ -113,10 +129,7 @@ class _login_pageState extends State<login_page> {
                           height: 1.4,
                         ),
                       ),
-
                       const SizedBox(height: 15),
-
-                      // Email
                       const Text(
                         "Email",
                         style: TextStyle(
@@ -125,80 +138,29 @@ class _login_pageState extends State<login_page> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       TextFormField(
                         controller: _emailController,
                         keyboardType: TextInputType.emailAddress,
-                        enabled: !_isLoading,
+                        enabled: !isLoading,
                         decoration: InputDecoration(
                           hintText: "Enter email id",
-                          hintStyle: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-
-                          prefixIcon: const Icon(
-                            Icons.email_outlined,
-                            color: CardGreen,
-                            size: 20,
-                          ),
-
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 20,
-                          ),
-
+                          prefixIcon: const Icon(Icons.email_outlined, color: CardGreen),
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Green,
-                              width: 1,
-                            ),
+                            borderSide: const BorderSide(color: Green),
                           ),
-
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Green,
-                              width: 1,
-                            ),
-                          ),
-
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                            ),
-                          ),
-
-                          focusedErrorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                            ),
+                            borderSide: const BorderSide(color: CardGreen, width: 2),
                           ),
                         ),
-
                         validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return "Email is required";
-                          }
-
-                          if (!RegExp(
-                            r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$',
-                          ).hasMatch(value.trim())) {
-                            return "Enter a valid email";
-                          }
-
+                          if (value == null || value.trim().isEmpty) return "Email is required";
                           return null;
                         },
                       ),
-
                       const SizedBox(height: 15),
-
-                      // Password
                       const Text(
                         "Password",
                         style: TextStyle(
@@ -207,97 +169,38 @@ class _login_pageState extends State<login_page> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                       const SizedBox(height: 8),
-
                       TextFormField(
                         controller: _passwordController,
                         obscureText: _obscurePassword,
-                        enabled: !_isLoading,
+                        enabled: !isLoading,
                         decoration: InputDecoration(
                           hintText: "Enter password",
-                          hintStyle: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-
-                          prefixIcon: const Icon(
-                            Icons.lock_outline,
-                            color: CardGreen,
-                            size: 20,
-                          ),
-
+                          prefixIcon: const Icon(Icons.lock_outline, color: CardGreen),
                           suffixIcon: IconButton(
-                            onPressed: () {
-                              setState(() {
-                                _obscurePassword = !_obscurePassword;
-                              });
-                            },
-                            icon: Icon(
-                              _obscurePassword
-                                  ? Icons.visibility_off
-                                  : Icons.visibility,
-                              color: Colors.grey,
-                            ),
+                            onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                            icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
                           ),
-
-                          contentPadding: const EdgeInsets.symmetric(
-                            vertical: 10,
-                            horizontal: 20,
-                          ),
-
                           enabledBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Green,
-                              width: 1,
-                            ),
+                            borderSide: const BorderSide(color: Green),
                           ),
-
                           focusedBorder: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Green,
-                              width: 1,
-                            ),
-                          ),
-
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                            ),
-                          ),
-
-                          focusedErrorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(16),
-                            borderSide: const BorderSide(
-                              color: Colors.red,
-                            ),
+                            borderSide: const BorderSide(color: CardGreen, width: 2),
                           ),
                         ),
-
                         validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return "Password is required";
-                          }
-
-                          if (value.length < 6) {
-                            return "Password must be at least 6 characters";
-                          }
-
+                          if (value == null || value.isEmpty) return "Password is required";
                           return null;
                         },
                       ),
-
                       const SizedBox(height: 35),
-
-                      // Login Button
                       SizedBox(
                         width: double.infinity,
                         height: 50,
                         child: ElevatedButton(
-                          onPressed: _isLoading ? null : _handleLogin,
+                          onPressed: isLoading ? null : _handleLogin,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: CardGreen,
                             foregroundColor: White,
@@ -305,65 +208,28 @@ class _login_pageState extends State<login_page> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                           ),
-                          child: _isLoading
-                              ? const SizedBox(
-                            height: 20,
-                            width: 20,
-                            child: CircularProgressIndicator(
-                              color: Colors.white,
-                              strokeWidth: 2,
-                            ),
-                          )
-                              : const Text(
-                            "Login",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          child: isLoading
+                              ? const CircularProgressIndicator(color: Colors.white)
+                              : const Text("Login", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ),
-
                       const SizedBox(height: 20),
-
-                      // Sign Up
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Text(
-                            "Don't have an account?",
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                          ),
-
+                          const Text("Don't have an account?"),
                           TextButton(
-                            onPressed: _isLoading
-                                ? null
-                                : () {
+                            onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(
-                                  builder: (context) =>
-                                  const RegisterScreen(),
-                                ),
+                                MaterialPageRoute(builder: (context) => const RegisterScreen()),
                               );
+                              log('szxdcfvgbhnj');
                             },
-                            child: const Text(
-                              "Sign Up",
-                              style: TextStyle(
-                                color: CardGreen,
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                            child: const Text("Register", style: TextStyle(color: CardGreen, fontWeight: FontWeight.bold)),
                           ),
                         ],
                       ),
-
-                      const SizedBox(height: 20),
                     ],
                   ),
                 ),
