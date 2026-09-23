@@ -25,13 +25,13 @@ class ScrapItemCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
           color: isSelected ? CardGreen : Colors.green.withOpacity(0.3),
-          width: 2,
+          width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
             color: Black.withOpacity(0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 6),
+            blurRadius: 6,
+            offset: const Offset(0, 3),
           ),
         ],
       ),
@@ -44,12 +44,12 @@ class ScrapItemCard extends StatelessWidget {
             children: [
             if(isSelected)
              const  Positioned(
-            top: 8,
-          right: 8,
+            top: 6,
+          right: 6,
           child: Icon(
             Icons.check,
             color: White,
-            size: 20,
+            size: 16,
           ),
         ),
         Center(
@@ -65,14 +65,14 @@ class ScrapItemCard extends StatelessWidget {
                   child: Icon(
                     item.icon,
                     color: isSelected ? CardGreen : CardGreen,
-                    size: 30,
+                    size: 20,
                   ),
                 ),
                 const SizedBox(height: 10),
                 Text(
                   item.title,
                   style: TextStyle(
-                    fontSize: 16,
+                    fontSize: 12,
                     color: isSelected ? White : Colors.black,
                     fontWeight: FontWeight.bold,
                   ),

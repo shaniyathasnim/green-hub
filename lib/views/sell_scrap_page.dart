@@ -31,22 +31,29 @@ class _SellScrapPageState extends State<SellScrapPage> {
   }
 
   final Set<String> _selectedItems = {};
-  final TextEditingController _weightController = TextEditingController();
+
+  // One weight controller per selected item id, created/disposed dynamically.
+  final Map<String, TextEditingController> _weightControllers = {};
+
   final TextEditingController _addressController = TextEditingController();
 
   void _toggleSelection(String id) {
     setState(() {
       if (_selectedItems.contains(id)) {
         _selectedItems.remove(id);
+        _weightControllers.remove(id)?.dispose();
       } else {
         _selectedItems.add(id);
+        _weightControllers[id] = TextEditingController();
       }
     });
   }
 
   @override
   void dispose() {
-    _weightController.dispose();
+    for (final controller in _weightControllers.values) {
+      controller.dispose();
+    }
     _addressController.dispose();
     super.dispose();
   }
@@ -54,7 +61,14 @@ class _SellScrapPageState extends State<SellScrapPage> {
   @override
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
-    final crossAxisCount = screenWidth > 100 ? 2 : 2;
+    final crossAxisCount = screenWidth > 100 ? 3: 3;
+
+    // Keep the dynamic fields in the same order as the source data list,
+    // rather than Set insertion order, so they don't jump around.
+    final selectedItemsInOrder = ScrapItemsData.scrapItems
+        .where((item) => _selectedItems.contains(item.id))
+        .toList();
+
     return Scaffold(
       backgroundColor: White,
       appBar: AppBar(
@@ -86,9 +100,9 @@ class _SellScrapPageState extends State<SellScrapPage> {
                 itemCount: ScrapItemsData.scrapItems.length,
                 gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: crossAxisCount,
-                  crossAxisSpacing: 13,
-                  mainAxisSpacing: 13,
-                  childAspectRatio: 0.9,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 1.0,
                 ),
                 itemBuilder: (context, index) {
                   final item = ScrapItemsData.scrapItems[index];
@@ -99,22 +113,41 @@ class _SellScrapPageState extends State<SellScrapPage> {
                   );
                 },
               ),
-              //form section
+
+              // Dynamic per-item weight fields.
+              // A field appears the moment its card is selected and is
+              // removed the moment it's deselected.
               const SizedBox(height: 18),
-              CustomTextField(
-                controller: _weightController,
-                label: "Estimate Weight(KG)",
-                hint: " Enter weight",
-                prefixIcon: Icon(Icons.scale_outlined, color: CardGreen),
-                maxLines: 1,
+              AnimatedSize(
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeInOut,
+                alignment: Alignment.topCenter,
+                child: selectedItemsInOrder.isEmpty
+                    ? const SizedBox.shrink()
+                    : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    for (final item in selectedItemsInOrder) ...[
+                      CustomTextField(
+                        key: ValueKey(item.id),
+                        controller: _weightControllers[item.id]!,
+                        label: "Estimated Weight — ${item.title} (KG)",
+                        hint: "Enter weight",
+                        prefixIcon:
+                        const Icon(Icons.scale_outlined, color: CardGreen),
+                        maxLines: 1,
+                        keyboardType: TextInputType.number,
+                      ),
+                      const SizedBox(height: 14),
+                    ],
+                  ],
+                ),
               ),
-              const SizedBox(height: 18),
 
               CustomTextField(
                 controller: _addressController,
                 label: "Pickup Address",
                 hint: "Enter your address",
-
                 prefixIcon: const Icon(
                   Icons.location_on_outlined,
                   color: CardGreen,
@@ -144,6 +177,20 @@ class _SellScrapPageState extends State<SellScrapPage> {
                     );
                     return;
                   }
+
+                  // Guard: make sure every selected item has a weight entered.
+                  final missingWeight = selectedItemsInOrder.any(
+                        (item) => (_weightControllers[item.id]?.text.trim().isEmpty ?? true),
+                  );
+                  if (missingWeight) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text("Please enter weight for all selected items."),
+                      ),
+                    );
+                    return;
+                  }
+
                   _showConfirmationDialog(context);
                 },
               ),

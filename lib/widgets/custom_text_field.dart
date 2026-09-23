@@ -7,6 +7,7 @@ class CustomTextField extends StatelessWidget {
   final Widget? prefixIcon;
   final int maxLines;
   final TextEditingController controller;
+  final TextInputType? keyboardType;
 
   const CustomTextField({
     super.key,
@@ -15,6 +16,7 @@ class CustomTextField extends StatelessWidget {
     this.prefixIcon,
     this.maxLines = 1,
     required this.controller,
+    this.keyboardType,
   });
 
   @override
@@ -31,33 +33,28 @@ class CustomTextField extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 8),
-
         TextField(
           controller: controller,
           maxLines: maxLines,
+          keyboardType: keyboardType,
           decoration: InputDecoration(
             hintText: hint,
             prefixIcon: prefixIcon,
             filled: true,
-            fillColor:LightGrey,
-
+            fillColor: LightGrey,
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-
             ),
-
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(
-                color:CardGreen,
+                color: CardGreen,
                 width: 2,
               ),
-    ),
-              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-
             ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
           ),
-
+        ),
       ],
     );
   }
