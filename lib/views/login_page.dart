@@ -31,7 +31,7 @@ class _login_pageState extends State<login_page> {
   }
 
   Future<void> _handleLogin() async {
-    if (_formKey.currentState!.validate()) {
+    if (!_formKey.currentState!.validate()) {
       return;
     }
       final provider = Provider.of<CustomerProvider>(
@@ -55,7 +55,7 @@ class _login_pageState extends State<login_page> {
                 backgroundColor: Colors.green),
           );
 
-          Navigator.pushReplacement(
+          Navigator.push(
             context,
             MaterialPageRoute(
                 builder: (context) => const HomePage()
