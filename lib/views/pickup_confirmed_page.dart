@@ -7,7 +7,16 @@ import 'package:green_bin/views/home_page.dart';
 
 
 class PickupConfirmedPage extends StatelessWidget {
-  const PickupConfirmedPage({super.key});
+  final String orderId;
+  final List<String>selectedItems;
+  final Map<String, double> weights;
+  final String pickupAddress;
+  const PickupConfirmedPage({super.key,
+    required this.orderId,
+    required this.selectedItems,
+    required this.weights,
+    required this.pickupAddress,
+  });
 
   @override
   Widget build(BuildContext context) {

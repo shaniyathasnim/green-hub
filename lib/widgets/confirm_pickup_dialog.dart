@@ -81,9 +81,10 @@ class ConfirmPickupDialog extends StatelessWidget {
                   child: CustomDialogButton(
                     text: "Done",
                     onPressed: () {
-                      Navigator.push(context, MaterialPageRoute(builder: (context) => const PickupConfirmedPage(),));
-                      // Logic for confirmation
-
+                      // Navigator.push(context,
+                      //     MaterialPageRoute(builder: (context) => const PickupConfirmedPage(),));
+                      // // Logic for confirmation
+                    Navigator.pop(context, true);
                     },
                   ),
                 ),
