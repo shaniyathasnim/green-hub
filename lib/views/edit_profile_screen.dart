@@ -1,36 +1,191 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:green_bin/views/profile_page.dart';
 
+import '../models/customer_model.dart';
 import '../utils/app_colors.dart';
+import '../utils/shared_prefs.dart';
 import 'image_edit_sceen.dart';
 
-/// EditProfileScreen
-/// Pixel-perfect recreation of the "Edit Profile" screen.
-/// Bottom navigation bar is intentionally excluded (already implemented elsewhere).
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
-
 
   @override
   State<EditProfileScreen> createState() => _EditProfileScreenState();
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  // final FirebaseAuth _auth = FirebaseAuth.instance;
+
   final TextEditingController _nameController =
-  TextEditingController(text: 'Arun');
+  TextEditingController();
+
   final TextEditingController _contactController =
-  TextEditingController(text: '+91 000 000 000 0');
-  final TextEditingController _passwordController =
-      TextEditingController(text: '******');
+  TextEditingController();
+
   final TextEditingController _addressController =
-  TextEditingController(text: '20th Mile, Perinthalmanna');
+  TextEditingController();
+
+  bool _isLoading = true;
+  bool _isUpdating = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  // --------------------------------------------------
+  // LOAD PROFILE
+  // --------------------------------------------------
+
+  Future<void> _loadProfile() async {
+    try {
+      final CustomerModel? customer =
+      await SharedPrefs.getUser();
+
+      if (customer == null || customer.uid == null) {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
+        return;
+      }
+
+      final DocumentSnapshot<Map<String, dynamic>> document =
+      await _firestore
+          .collection('customers')
+          .doc(customer.uid)
+          .get();
+
+      if (document.exists) {
+        final data = document.data();
+
+        _nameController.text =
+            data?['name']?.toString() ?? '';
+
+        _contactController.text =
+            data?['phoneNumber']?.toString() ?? '';
+
+        _addressController.text =
+            data?['address']?.toString() ?? '';
+      }
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error loading profile: $e');
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // --------------------------------------------------
+  // UPDATE PROFILE
+  // --------------------------------------------------
+
+
+  Future<void> _updateProfile() async {
+    final String name = _nameController.text.trim();
+    final String phone = _contactController.text.trim();
+    final String address = _addressController.text.trim();
+
+    if (name.isEmpty ||
+        phone.isEmpty ||
+        address.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please fill in all fields'),
+        ),
+      );
+      return;
+    }
+
+    final CustomerModel? customer =
+    await SharedPrefs.getUser();
+
+    if (customer == null || customer.uid == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Customer information not found'),
+        ),
+      );
+      return;
+    }
+
+    setState(() {
+      _isUpdating = true;
+    });
+
+    try {
+      await _firestore
+          .collection('customers')
+          .doc(customer.uid)
+          .update({
+        'name': name,
+        'phoneNumber': phone,
+        'address': address,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+
+      // Update SharedPreferences too
+      final CustomerModel updatedCustomer =
+      customer.copyWith(
+        name: name,
+        phoneNumber: phone,
+        address: address,
+      );
+
+      await SharedPrefs.setUser(updatedCustomer);
+
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Profile updated successfully'),
+        ),
+      );
+
+      Navigator.pop(context);
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to update profile: $e'),
+        ),
+      );
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdating = false;
+        });
+      }
+    }
+  }
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+      ),
+    );
+  }
 
   @override
   void dispose() {
     _nameController.dispose();
     _contactController.dispose();
     _addressController.dispose();
-    _passwordController.dispose();
     super.dispose();
   }
 
@@ -39,43 +194,62 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     return Scaffold(
       backgroundColor: White,
       body: SafeArea(
-        child: Column(
+        child: _isLoading
+            ? const Center(
+          child: CircularProgressIndicator(
+            color: CardGreen,
+          ),
+        )
+            : Column(
           children: [
             _buildAppBar(),
+
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                padding: const EdgeInsets.fromLTRB(
+                  20,
+                  16,
+                  20,
+                  20,
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                  crossAxisAlignment:
+                  CrossAxisAlignment.start,
                   children: [
-                    Center(child: _buildAvatar()),
+                    Center(
+                      child: _buildAvatar(),
+                    ),
+
                     const SizedBox(height: 28),
+
                     _buildLabel('Name'),
+
                     const SizedBox(height: 8),
+
                     _buildField(
                       controller: _nameController,
                       icon: Icons.person_outline,
                     ),
+
                     const SizedBox(height: 18),
+
                     _buildLabel('Contact Number'),
+
                     const SizedBox(height: 8),
+
                     _buildField(
                       controller: _contactController,
                       icon: Icons.call_outlined,
                       keyboardType: TextInputType.phone,
                     ),
+
                     const SizedBox(height: 18),
-                    _buildLabel('Password'),
-                    const SizedBox(height: 8),
-                    _buildField(
-                      controller: _passwordController,
-                      icon: Icons.password,
-                      keyboardType: TextInputType.visiblePassword,
-                    ),
-                    const SizedBox(height: 18),
+
                     _buildLabel('Home Address'),
+
                     const SizedBox(height: 8),
+
                     _buildField(
                       controller: _addressController,
                       icon: Icons.location_on_outlined,
@@ -84,6 +258,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 ),
               ),
             ),
+
             _buildUpdateButton(),
           ],
         ),
@@ -91,21 +266,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // ---------------- APP BAR ----------------
+  // --------------------------------------------------
+  // APP BAR
+  // --------------------------------------------------
+
   Widget _buildAppBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
+      padding: const EdgeInsets.fromLTRB(
+        12,
+        8,
+        20,
+        8,
+      ),
       child: Row(
         children: [
           IconButton(
-            onPressed: () => Navigator.of(context).maybePop(),
+            onPressed: () {
+              Navigator.of(context).maybePop();
+            },
             icon: const Icon(
               Icons.arrow_back,
-              color: White,
+              color: Black,
               size: 22,
             ),
           ),
+
           const SizedBox(width: 4),
+
           const Text(
             'Edit Profile',
             style: TextStyle(
@@ -119,7 +306,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // ---------------- AVATAR ----------------
+  // --------------------------------------------------
+  // AVATAR
+  // --------------------------------------------------
+
   Widget _buildAvatar() {
     return SizedBox(
       width: 92,
@@ -130,65 +320,67 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           const CircleAvatar(
             radius: 46,
             backgroundColor: White,
-            // Replace with NetworkImage/AssetImage of the user's photo
             backgroundImage: AssetImage(
               'assets/profile_image.png',
             ),
           ),
+
           Positioned(
             right: 0,
             bottom: 2,
-
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(30),
-                  onTap: () {
-                    showModalBottomSheet(
-                      context: context,
-                      backgroundColor: Colors.transparent,
-                      isScrollControlled: true,
-                      builder: (_) {
-                        return ImagePickerBottomSheet(
-                          onGalleryTap: () {
-                            Navigator.pop(context);
-                            // Gallery action
-                          },
-                          onCameraTap: () {
-                            Navigator.pop(context);
-                            // Camera action
-                          },
-                          onRemoveTap: () {
-                            Navigator.pop(context);
-                            // Remove image action
-                          },
-                        );
+            child: InkWell(
+              borderRadius: BorderRadius.circular(30),
+              onTap: () {
+                showModalBottomSheet(
+                  context: context,
+                  backgroundColor: Colors.transparent,
+                  isScrollControlled: true,
+                  builder: (_) {
+                    return ImagePickerBottomSheet(
+                      onGalleryTap: () {
+                        Navigator.pop(context);
+                        // Gallery action
+                      },
+                      onCameraTap: () {
+                        Navigator.pop(context);
+                        // Camera action
+                      },
+                      onRemoveTap: () {
+                        Navigator.pop(context);
+                        // Remove image action
                       },
                     );
                   },
-                  child: Container(
-                    width: 28,
-                    height: 28,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: CardGreen,
-                      border: Border.all(
-                        color: Colors.white,
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.camera_alt_outlined,
-                      color: Colors.white,
-                      size: 14,
-                    ),
+                );
+              },
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: CardGreen,
+                  border: Border.all(
+                    color: Colors.white,
+                    width: 2,
                   ),
                 ),
+                child: const Icon(
+                  Icons.camera_alt_outlined,
+                  color: Colors.white,
+                  size: 14,
+                ),
               ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ---------------- LABEL ----------------
+  // --------------------------------------------------
+  // LABEL
+  // --------------------------------------------------
+
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -200,7 +392,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // ---------------- FIELD ----------------
+  // --------------------------------------------------
+  // FIELD
+  // --------------------------------------------------
+
   Widget _buildField({
     required TextEditingController controller,
     required IconData icon,
@@ -211,17 +406,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       decoration: BoxDecoration(
         color: LightGrey,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color:DarkGrey, width: 1),
+        border: Border.all(
+          color: DarkGrey,
+          width: 1,
+        ),
       ),
       child: Row(
         children: [
           const SizedBox(width: 14),
+
           Icon(
             icon,
             size: 19,
             color: CardGreen,
           ),
+
           const SizedBox(width: 10),
+
           Expanded(
             child: TextField(
               controller: controller,
@@ -234,37 +435,55 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(vertical: 14),
+                contentPadding: EdgeInsets.symmetric(
+                  vertical: 14,
+                ),
               ),
             ),
           ),
+
           const SizedBox(width: 14),
         ],
       ),
     );
   }
 
-  // ---------------- UPDATE BUTTON ----------------
+  // --------------------------------------------------
+  // UPDATE BUTTON
+  // --------------------------------------------------
+
   Widget _buildUpdateButton() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
+      padding: const EdgeInsets.fromLTRB(
+        20,
+        8,
+        20,
+        16,
+      ),
       child: SizedBox(
         width: double.infinity,
         height: 52,
         child: ElevatedButton(
-          onPressed: () {
-            Navigator.push(context, MaterialPageRoute(builder: (context) => const ProfileScreen()));
-            // TODO: handle update action
-          },
+          onPressed: _isUpdating ? null : _updateProfile,
           style: ElevatedButton.styleFrom(
             backgroundColor: CardGreen,
             foregroundColor: Colors.white,
+            disabledBackgroundColor: Grey,
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
             ),
           ),
-          child: const Text(
+          child: _isUpdating
+              ? const SizedBox(
+            height: 22,
+            width: 22,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: Colors.white,
+            ),
+          )
+              : const Text(
             'Update',
             style: TextStyle(
               fontSize: 16,

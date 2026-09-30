@@ -17,13 +17,27 @@ static Future<void> setUser(CustomerModel user) async {
 await _prefs.setString(_keyUser, jsonEncode(user.toMap()));
 await _prefs.setBool(_keyIsLoggedIn, true);
 }
-// Get User
-static CustomerModel? getUser() {
-String? userJson = _prefs.getString(_keyUser);
-if (userJson == null) return null;
-return CustomerModel.fromMap(jsonDecode(userJson));
-}
+// ----Get User--------
 
+// static CustomerModel? getUser() {
+// String? userJson = _prefs.getString(_keyUser);
+// if (userJson == null) return null;
+// return CustomerModel.fromMap(jsonDecode(userJson));
+// }
+  static Future<CustomerModel?> getUser() async {
+    final SharedPreferences prefs =
+    await SharedPreferences.getInstance();
+
+    final String? userData = prefs.getString(_keyUser);
+
+    if (userData == null) {
+      return null;
+    }
+
+    return CustomerModel.fromMap(
+      jsonDecode(userData),
+    );
+  }
 // Check Login Status
 static bool isLoggedIn() {
 return _prefs.getBool(_keyIsLoggedIn) ?? false;

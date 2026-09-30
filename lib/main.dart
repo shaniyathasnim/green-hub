@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:green_bin/providers/order_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:green_bin/providers/customer_provider.dart';
 import 'package:green_bin/views/splash_page.dart';
@@ -18,6 +19,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => CustomerProvider()),
+        ChangeNotifierProvider(create: (_)=>OrderProvider(),),
       ],
       child: const MyApp(),
     ),

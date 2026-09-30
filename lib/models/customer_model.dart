@@ -5,6 +5,7 @@ class CustomerModel {
   final String? email;
   final String? address;
   final String? password;
+ final String? profileImageUrl;
 
   CustomerModel({
     this.uid,
@@ -13,6 +14,7 @@ class CustomerModel {
     this.email,
     this.address,
     this.password,
+    this.profileImageUrl,
   });
 
   factory CustomerModel.fromMap(Map<String, dynamic> map) {
@@ -23,6 +25,7 @@ class CustomerModel {
       email: map['email'],
       address: map['address'],
       password: map['password'],
+      profileImageUrl: map['profileImageUrl'],
     );
   }
 
@@ -34,6 +37,7 @@ class CustomerModel {
       'email': email,
       'address': address,
       'password': password,
+      'profileImageUrl': profileImageUrl,
     };
   }
 
@@ -44,6 +48,8 @@ class CustomerModel {
     String? email,
     String? address,
     String? password,
+    String? profileImageUrl,
+
   }) {
     return CustomerModel(
       uid: uid ?? this.uid,
@@ -52,6 +58,7 @@ class CustomerModel {
       email: email ?? this.email,
       address: address ?? this.address,
       password: password ?? this.password,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
     );
   }
 }
