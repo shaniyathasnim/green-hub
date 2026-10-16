@@ -25,7 +25,7 @@ class CustomerModel {
       email: map['email'],
       address: map['address'],
       password: map['password'],
-      profileImageUrl: map['profileImageUrl'],
+      profileImageUrl: map['profileImageUrl']?.toString(),
     );
   }
 

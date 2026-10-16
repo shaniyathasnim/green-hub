@@ -2,12 +2,14 @@ import 'dart:developer';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../models/customer_model.dart';
+import '../services/cloudinary_service.dart';
+import '../utils/shared_prefs.dart';
 
 class CustomerProvider with ChangeNotifier {
-  final FirebaseFirestore _firestore =
-      FirebaseFirestore.instance;
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
   CustomerModel? _customer;
 
@@ -34,6 +36,33 @@ class CustomerProvider with ChangeNotifier {
   }
 
   // ============================================================
+  // LOAD CUSTOMER FROM SHARED PREFERENCES
+  // ============================================================
+
+  Future<void> loadCustomer() async {
+    try {
+      final bool loggedIn = SharedPrefs.isLoggedIn();
+
+      if (!loggedIn) {
+        log('No logged-in customer');
+        return;
+      }
+
+      final CustomerModel? savedCustomer = await SharedPrefs.getUser();
+
+      if (savedCustomer != null) {
+        _customer = savedCustomer;
+
+        log('Customer loaded: ${savedCustomer.email}');
+
+        notifyListeners();
+      }
+    } catch (e) {
+      log('Load customer error: $e');
+    }
+  }
+
+  // ============================================================
   // CREATE PICKUP ORDER
   // ============================================================
 
@@ -42,72 +71,36 @@ class CustomerProvider with ChangeNotifier {
     required Map<String, double> weights,
     required String pickupAddress,
   }) async {
-    // Check customer login
     if (_customer == null ||
         _customer!.uid == null ||
         _customer!.uid!.isEmpty) {
-      throw Exception(
-        'Customer is not logged in',
-      );
+      throw Exception('Customer is not logged in');
     }
 
     _setLoading(true);
 
     try {
-      // --------------------------------------------------------
-      // Generate Order ID
-      // --------------------------------------------------------
-
-      final String orderId =
-          'SG-${DateTime.now().millisecondsSinceEpoch}';
-
-      // --------------------------------------------------------
-      // Prepare Order Data
-      // --------------------------------------------------------
+      final String orderId = 'SG-${DateTime.now().millisecondsSinceEpoch}';
 
       final Map<String, dynamic> orderData = {
         'orderId': orderId,
-
         'customerId': _customer!.uid,
-
-        'customerName':
-        _customer!.name ?? '',
-
-        'customerEmail':
-        _customer!.email ?? '',
-
+        'customerName': _customer!.name ?? '',
+        'customerEmail': _customer!.email ?? '',
         'selectedItems': selectedItems,
-
         'weights': weights,
-
         'pickupAddress': pickupAddress,
-
         'status': 'Pending',
-
-        'createdAt':
-        FieldValue.serverTimestamp(),
+        'createdAt': FieldValue.serverTimestamp(),
       };
 
-      // --------------------------------------------------------
-      // Save to Firestore
-      // --------------------------------------------------------
+      await _firestore.collection('pickupOrders').doc(orderId).set(orderData);
 
-      await _firestore
-          .collection('pickupOrders')
-          .doc(orderId)
-          .set(orderData);
+      log('Pickup order created: $orderId');
 
-      log(
-        'Pickup order created successfully: $orderId',
-      );
-
-      // IMPORTANT:
-      // Return Order ID to SellScrapPage
       return orderId;
     } catch (e) {
-      log(
-        'Failed to create pickup order: $e',
-      );
+      log('Failed to create pickup order: $e');
 
       rethrow;
     } finally {
@@ -116,7 +109,7 @@ class CustomerProvider with ChangeNotifier {
   }
 
   // ============================================================
-  // EMAIL / PASSWORD REGISTER
+  // REGISTER
   // ============================================================
 
   Future<void> registerWithEmail({
@@ -127,65 +120,85 @@ class CustomerProvider with ChangeNotifier {
     _setLoading(true);
 
     try {
+      final String cleanName = name.trim();
+
+      final String cleanEmail = email.trim().toLowerCase();
+
+      final String cleanPassword = password.trim();
+
+      if (cleanName.isEmpty) {
+        throw Exception('Please enter your name');
+      }
+
+      if (cleanEmail.isEmpty) {
+        throw Exception('Please enter your email');
+      }
+
+      if (cleanPassword.isEmpty) {
+        throw Exception('Please enter your password');
+      }
+
       // --------------------------------------------------------
-      // Check Existing Email
+      // CHECK EXISTING EMAIL
       // --------------------------------------------------------
 
-      final QuerySnapshot<Map<String, dynamic>> existing =
-      await _firestore
+      final QuerySnapshot<Map<String, dynamic>> existing = await _firestore
           .collection('customers')
-          .where(
-        'email',
-        isEqualTo: email,
-      )
+          .where('email', isEqualTo: cleanEmail)
           .limit(1)
           .get();
 
       if (existing.docs.isNotEmpty) {
-        throw Exception(
-          'An account with this email already exists',
-        );
+        throw Exception('An account with this email already exists');
       }
 
       // --------------------------------------------------------
-      // Generate Custom UID
+      // CREATE UID
       // --------------------------------------------------------
 
-      final String uid =
-      DateTime.now()
-          .millisecondsSinceEpoch
-          .toString();
+      final String uid = DateTime.now().millisecondsSinceEpoch.toString();
 
       // --------------------------------------------------------
-      // Create Customer
+      // CREATE CUSTOMER MODEL
       // --------------------------------------------------------
 
-      _customer = CustomerModel(
+      final CustomerModel newCustomer = CustomerModel(
         uid: uid,
-        name: name,
-        email: email,
-        password: password,
+        name: cleanName,
+        email: cleanEmail,
+        password: cleanPassword,
         address: '',
+        phoneNumber: '',
+        profileImageUrl: '',
       );
 
       // --------------------------------------------------------
-      // Save Customer
+      // SAVE TO FIRESTORE
       // --------------------------------------------------------
 
-      await _firestore
-          .collection('customers')
-          .doc(uid)
-          .set(
-        _customer!.toMap(),
-      );
+      await _firestore.collection('customers').doc(uid).set({
+        ...newCustomer.toMap(),
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
-      _isNewUser = false;
+      // --------------------------------------------------------
+      // SAVE LOCALLY
+      // --------------------------------------------------------
+
+      _customer = newCustomer;
+
+      _isNewUser = true;
+
+      await SharedPrefs.setUser(newCustomer);
 
       notifyListeners();
+
+      log('Registration successful');
+
+      log('Customer ID: $uid');
     } catch (e) {
-      log(
-        'Registration error: $e',
-      );
+      log('Registration error: $e');
 
       rethrow;
     } finally {
@@ -194,70 +207,82 @@ class CustomerProvider with ChangeNotifier {
   }
 
   // ============================================================
-  // EMAIL / PASSWORD LOGIN
+  // LOGIN
   // ============================================================
 
-  Future<void> loginWithEmail(
-      String email,
-      String password,
-      ) async {
+  Future<void> loginWithEmail(String email, String password) async {
     _setLoading(true);
 
     try {
+      final String cleanEmail = email.trim().toLowerCase();
+
+      final String cleanPassword = password.trim();
+
+      log('================================');
+      log('LOGIN STARTED');
+      log('Email: $cleanEmail');
+
       // --------------------------------------------------------
-      // Find Customer
+      // FIND CUSTOMER
       // --------------------------------------------------------
 
-      final QuerySnapshot<Map<String, dynamic>> snapshot =
-      await _firestore
+      final QuerySnapshot<Map<String, dynamic>> snapshot = await _firestore
           .collection('customers')
-          .where(
-        'email',
-        isEqualTo: email,
-      )
+          .where('email', isEqualTo: cleanEmail)
           .limit(1)
           .get();
 
+      log('Customers found: ${snapshot.docs.length}');
+
       if (snapshot.docs.isEmpty) {
-        throw Exception(
-          'No account found with this email',
-        );
+        throw Exception('No account found with this email');
       }
 
       // --------------------------------------------------------
-      // Get Customer Data
+      // GET DATA
       // --------------------------------------------------------
 
-      final Map<String, dynamic> data =
-      snapshot.docs.first.data();
+      final Map<String, dynamic> data = snapshot.docs.first.data();
 
-      final String storedPassword =
-          data['password']?.toString() ?? '';
+      log('Customer UID: ${data['uid']}');
+
+      log('Customer email: ${data['email']}');
 
       // --------------------------------------------------------
-      // Check Password
+      // CHECK PASSWORD
       // --------------------------------------------------------
 
-      if (storedPassword != password) {
-        throw Exception(
-          'Incorrect password',
-        );
+      final String storedPassword = data['password']?.toString() ?? '';
+
+      if (storedPassword != cleanPassword) {
+        log('Password does not match');
+
+        throw Exception('Incorrect password');
       }
 
+      log('Password matched');
+
       // --------------------------------------------------------
-      // Set Current Customer
+      // CREATE CUSTOMER MODEL
       // --------------------------------------------------------
 
-      _customer =
-          CustomerModel.fromMap(data);
+      _customer = CustomerModel.fromMap(data);
 
       _isNewUser = false;
 
+      // --------------------------------------------------------
+      // SAVE LOGIN SESSION
+      // --------------------------------------------------------
+
+      await SharedPrefs.setUser(_customer!);
+
       notifyListeners();
+
+      log('LOGIN SUCCESS');
+
+      log('================================');
     } catch (e) {
-      log(
-        'Login error: $e',
-      );
+      log('Login error: $e');
 
       rethrow;
     } finally {
@@ -273,58 +298,119 @@ class CustomerProvider with ChangeNotifier {
     required String name,
     required String email,
     required String address,
+    required String phoneNumber,
+
   }) async {
     if (_customer == null) {
-      throw Exception(
-        'Customer is not logged in',
-      );
+      throw Exception('Customer is not logged in');
     }
 
-    if (_customer!.uid == null ||
-        _customer!.uid!.isEmpty) {
-      throw Exception(
-        'Customer ID is missing',
+    if (_customer!.uid == null || _customer!.uid!.isEmpty) {
+      throw Exception('Customer ID is missing');
+    }
+
+    _setLoading(true);
+
+    try {
+      final String cleanName = name.trim();
+
+      final String cleanEmail = email.trim().toLowerCase();
+
+      final String cleanAddress = address.trim();
+
+      final CustomerModel updatedCustomer = _customer!.copyWith(
+        name: cleanName,
+        email: cleanEmail,
+        address: cleanAddress,
       );
+
+      await _firestore
+          .collection('customers')
+          .doc(updatedCustomer.uid!)
+          .update({
+            'name': cleanName,
+            'email': cleanEmail,
+            'address': cleanAddress,
+            'updatedAt': FieldValue.serverTimestamp(),
+            'phoneNumber': phoneNumber,
+          });
+
+      _customer = updatedCustomer;
+
+      await SharedPrefs.setUser(updatedCustomer);
+
+      _isNewUser = false;
+
+      notifyListeners();
+
+      log('Profile updated successfully');
+    } catch (e) {
+      log('Profile update error: $e');
+
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ============================================================
+  // UPDATE PROFILE PHOTO
+  // ============================================================
+
+  Future<void> updateProfilePhoto(XFile imageFile) async {
+    if (_customer == null) {
+      throw Exception('Customer is not logged in');
+    }
+
+    if (_customer!.uid == null || _customer!.uid!.isEmpty) {
+      throw Exception('Customer ID is missing');
     }
 
     _setLoading(true);
 
     try {
       // --------------------------------------------------------
-      // Create Updated Customer
+      // CLOUDINARY UPLOAD
       // --------------------------------------------------------
 
-      final CustomerModel updatedCustomer =
-      _customer!.copyWith(
-        name: name,
-        email: email,
-        address: address,
-      );
+      log('Uploading profile image to Cloudinary...');
+
+      final String? imageUrl = await CloudinaryService.uploadImage(imageFile);
+
+      if (imageUrl == null || imageUrl.isEmpty) {
+        throw Exception('Cloudinary image upload failed');
+      }
+
+      log('Cloudinary upload successful');
+
+      log('Image URL: $imageUrl');
 
       // --------------------------------------------------------
-      // Update Firestore
+      // FIRESTORE UPDATE
       // --------------------------------------------------------
 
-      await _firestore
-          .collection('customers')
-          .doc(updatedCustomer.uid!)
-          .update(
-        updatedCustomer.toMap(),
-      );
+      await _firestore.collection('customers').doc(_customer!.uid!).update({
+        'profileImageUrl': imageUrl,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
 
       // --------------------------------------------------------
-      // Update Local Customer
+      // UPDATE LOCAL CUSTOMER
       // --------------------------------------------------------
 
-      _customer = updatedCustomer;
+      _customer = _customer!.copyWith(profileImageUrl: imageUrl);
 
-      _isNewUser = false;
+      // --------------------------------------------------------
+      // UPDATE SHARED PREFS
+      // --------------------------------------------------------
+
+      await SharedPrefs.setUser(_customer!);
 
       notifyListeners();
+
+      log('Profile image updated successfully');
     } catch (e) {
-      log(
-        'Profile update error: $e',
-      );
+      log('Profile image update error: $e');
 
       rethrow;
     } finally {
@@ -337,10 +423,20 @@ class CustomerProvider with ChangeNotifier {
   // ============================================================
 
   Future<void> logout() async {
-    _customer = null;
+    try {
+      _customer = null;
 
-    _isNewUser = false;
+      _isNewUser = false;
 
-    notifyListeners();
+      await SharedPrefs.clear();
+
+      notifyListeners();
+
+      log('Customer logged out');
+    } catch (e) {
+      log('Logout error: $e');
+
+      rethrow;
+    }
   }
 }

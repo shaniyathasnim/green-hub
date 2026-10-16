@@ -1,12 +1,17 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:green_bin/views/profile_page.dart';
+import 'package:flutter/services.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:provider/provider.dart';
 
 import '../models/customer_model.dart';
+import '../providers/customer_provider.dart';
+import '../services/cloudinary_service.dart';
 import '../utils/app_colors.dart';
 import '../utils/shared_prefs.dart';
-import 'image_edit_sceen.dart';
+import 'image_edit_screen.dart';
 
 class EditProfileScreen extends StatefulWidget {
   const EditProfileScreen({super.key});
@@ -16,72 +21,108 @@ class EditProfileScreen extends StatefulWidget {
 }
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
+  // =========================================================
+  // CONTROLLERS
+  // =========================================================
+
+  final TextEditingController _nameController = TextEditingController();
+
+  final TextEditingController _contactController = TextEditingController();
+
+  final TextEditingController _addressController = TextEditingController();
+
+  // =========================================================
+  // FIRESTORE
+  // =========================================================
+
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  // final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  final TextEditingController _nameController =
-  TextEditingController();
+  // =========================================================
+  // IMAGE PICKER
+  // =========================================================
 
-  final TextEditingController _contactController =
-  TextEditingController();
+  final ImagePicker _imagePicker = ImagePicker();
 
-  final TextEditingController _addressController =
-  TextEditingController();
+  // =========================================================
+  // STATE
+  // =========================================================
+
+  Uint8List? _selectedImageBytes;
+
+  XFile? _selectedImage;
+
+  String? _profileImageUrl;
 
   bool _isLoading = true;
+
   bool _isUpdating = false;
+
+  // =========================================================
+  // INIT
+  // =========================================================
 
   @override
   void initState() {
     super.initState();
+
     _loadProfile();
   }
 
-  // --------------------------------------------------
+  // =========================================================
   // LOAD PROFILE
-  // --------------------------------------------------
+  // =========================================================
 
   Future<void> _loadProfile() async {
     try {
-      final CustomerModel? customer =
-      await SharedPrefs.getUser();
+      final CustomerModel? customer = await SharedPrefs.getUser();
 
-      if (customer == null || customer.uid == null) {
+      if (customer == null || customer.uid == null || customer.uid!.isEmpty) {
         if (mounted) {
           setState(() {
             _isLoading = false;
           });
         }
+
+        _showMessage('Customer information not found');
+
         return;
       }
 
-      final DocumentSnapshot<Map<String, dynamic>> document =
-      await _firestore
+      debugPrint('Loading customer: ${customer.uid}');
+
+      final DocumentSnapshot<Map<String, dynamic>> document = await _firestore
           .collection('customers')
-          .doc(customer.uid)
+          .doc(customer.uid!)
           .get();
 
-      if (document.exists) {
-        final data = document.data();
-
-        _nameController.text =
-            data?['name']?.toString() ?? '';
-
-        _contactController.text =
-            data?['phoneNumber']?.toString() ?? '';
-
-        _addressController.text =
-            data?['address']?.toString() ?? '';
+      if (!document.exists) {
+        throw Exception('Customer document not found');
       }
+
+      final Map<String, dynamic> data = document.data() ?? {};
+
+      if (!mounted) return;
+
+      setState(() {
+        _nameController.text = data['name']?.toString() ?? '';
+
+        _contactController.text = data['phoneNumber']?.toString() ?? '';
+
+        _addressController.text = data['address']?.toString() ?? '';
+
+        _profileImageUrl = data['profileImageUrl']?.toString();
+      });
+
+      debugPrint('Profile image URL: $_profileImageUrl');
+    } catch (e, stackTrace) {
+      debugPrint('LOAD PROFILE ERROR: $e');
+
+      debugPrint('STACK TRACE: $stackTrace');
 
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
+        _showMessage('Failed to load profile');
       }
-    } catch (e) {
-      debugPrint('Error loading profile: $e');
-
+    } finally {
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -90,82 +131,281 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
-  // --------------------------------------------------
+  // =========================================================
+  // PICK IMAGE FROM GALLERY
+  // =========================================================
+
+  Future<void> _pickFromGallery() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 80,
+      );
+
+      if (image == null) {
+        return;
+      }
+
+      final Uint8List bytes = await image.readAsBytes();
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedImage = image;
+        _selectedImageBytes = bytes;
+      });
+
+      debugPrint('Gallery image selected: ${image.name}');
+    } catch (e, stackTrace) {
+      debugPrint('GALLERY IMAGE ERROR: $e');
+
+      debugPrint('$stackTrace');
+
+      if (mounted) {
+        _showMessage('Unable to select image');
+      }
+    }
+  }
+
+  // =========================================================
+  // PICK IMAGE FROM CAMERA
+  // =========================================================
+
+  Future<void> _pickFromCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+
+      if (image == null) {
+        return;
+      }
+
+      final Uint8List bytes = await image.readAsBytes();
+
+      if (!mounted) return;
+
+      setState(() {
+        _selectedImage = image;
+        _selectedImageBytes = bytes;
+      });
+
+      debugPrint('Camera image selected: ${image.name}');
+    } catch (e, stackTrace) {
+      debugPrint('CAMERA IMAGE ERROR: $e');
+
+      debugPrint('$stackTrace');
+
+      if (mounted) {
+        _showMessage('Unable to capture image');
+      }
+    }
+  }
+
+  // =========================================================
+  // REMOVE IMAGE
+  // =========================================================
+
+  void _removeImage() {
+    if (!mounted) return;
+
+    setState(() {
+      _selectedImage = null;
+      _selectedImageBytes = null;
+      _profileImageUrl = null;
+    });
+
+    _showMessage('Profile image removed');
+  }
+
+  // =========================================================
+  // IMAGE PICKER BOTTOM SHEET
+  // =========================================================
+
+  void _showImagePicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        return ImagePickerBottomSheet(
+          onGalleryTap: () {
+            Navigator.pop(context);
+
+            _pickFromGallery();
+          },
+          onCameraTap: () {
+            Navigator.pop(context);
+
+            _pickFromCamera();
+          },
+          onRemoveTap: () {
+            Navigator.pop(context);
+
+            _removeImage();
+          },
+        );
+      },
+    );
+  }
+
+  // =========================================================
   // UPDATE PROFILE
-  // --------------------------------------------------
-
-
+  // =========================================================
   Future<void> _updateProfile() async {
-    final String name = _nameController.text.trim();
-    final String phone = _contactController.text.trim();
-    final String address = _addressController.text.trim();
-
-    if (name.isEmpty ||
-        phone.isEmpty ||
-        address.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please fill in all fields'),
-        ),
-      );
+    // Prevent multiple update button clicks
+    if (_isUpdating) return;
+    //-----validate contact number-----
+    final String? contactError = _validateContactNumber(_contactController.text);
+    if (contactError != null) {
+      _showMessage(contactError);
       return;
     }
+    //----------------------------------
 
-    final CustomerModel? customer =
-    await SharedPrefs.getUser();
 
-    if (customer == null || customer.uid == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Customer information not found'),
-        ),
-      );
-      return;
-    }
-
+    // Start loading
     setState(() {
       _isUpdating = true;
     });
 
     try {
-      await _firestore
-          .collection('customers')
-          .doc(customer.uid)
-          .update({
-        'name': name,
-        'phoneNumber': phone,
-        'address': address,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
+      // =======================================================
+      // GET CUSTOMER PROVIDER
+      // =======================================================
 
-      // Update SharedPreferences too
-      final CustomerModel updatedCustomer =
-      customer.copyWith(
-        name: name,
-        phoneNumber: phone,
-        address: address,
+      final CustomerProvider customerProvider =
+      Provider.of<CustomerProvider>(
+        context,
+        listen: false,
       );
 
-      await SharedPrefs.setUser(updatedCustomer);
+      // =======================================================
+      // CHECK CUSTOMER
+      // =======================================================
+
+      if (customerProvider.customer == null) {
+        throw Exception('Customer is not logged in');
+      }
+
+      // =======================================================
+      // GET CURRENT EMAIL
+      // =======================================================
+
+      final String currentEmail =
+          customerProvider.customer!.email ?? '';
+
+      // =======================================================
+      // UPDATE PROFILE IMAGE
+      // =======================================================
+
+      if (_selectedImage != null) {
+        debugPrint(
+          '========================================',
+        );
+
+        debugPrint(
+          'Uploading new profile image...',
+        );
+
+        debugPrint(
+          'Image name: ${_selectedImage!.name}',
+        );
+
+        await customerProvider.updateProfilePhoto(
+          _selectedImage!,
+        );
+
+        debugPrint(
+          'Profile image uploaded successfully',
+        );
+
+        debugPrint(
+          '========================================',
+        );
+      }
+
+      // =======================================================
+      // UPDATE NAME + EMAIL + ADDRESS
+      // =======================================================
+
+      debugPrint(
+        'Updating customer information...',
+      );
+
+      await customerProvider.updateCustomerProfile(
+        name: _nameController.text.trim(),
+        email: currentEmail,
+        address: _addressController.text.trim(),
+        phoneNumber: _contactController.text.trim(),
+      );
+
+      debugPrint(
+        'Customer information updated successfully',
+      );
+
+      // =======================================================
+      // CHECK WIDGET
+      // =======================================================
 
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Profile updated successfully'),
-        ),
+      // =======================================================
+      // SUCCESS MESSAGE
+      // =======================================================
+
+      _showMessage(
+        'Profile updated successfully',
       );
 
-      Navigator.pop(context);
-    } catch (e) {
+      // =======================================================
+      // RETURN TO PROFILE SCREEN
+      // =======================================================
+
+      Navigator.pop(
+        context,
+        true,
+      );
+    } catch (e, stackTrace) {
+      // =======================================================
+      // ERROR
+      // =======================================================
+
+      debugPrint(
+        '========================================',
+      );
+
+      debugPrint(
+        'UPDATE PROFILE ERROR',
+      );
+
+      debugPrint(
+        '$e',
+      );
+
+      debugPrint(
+        'STACK TRACE',
+      );
+
+      debugPrint(
+        '$stackTrace',
+      );
+
+      debugPrint(
+        '========================================',
+      );
+
       if (!mounted) return;
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to update profile: $e'),
-        ),
+      _showMessage(
+        'Failed to update profile',
       );
     } finally {
+      // =======================================================
+      // STOP LOADING
+      // =======================================================
+
       if (mounted) {
         setState(() {
           _isUpdating = false;
@@ -173,21 +413,40 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
     }
   }
+
+
+  // =========================================================
+  // SHOW MESSAGE
+  // =========================================================
+
   void _showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-      ),
-    );
+    if (!mounted) return;
+
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
+      );
   }
+
+  // =========================================================
+  // DISPOSE
+  // =========================================================
 
   @override
   void dispose() {
     _nameController.dispose();
+
     _contactController.dispose();
+
     _addressController.dispose();
+
     super.dispose();
   }
+
+  // =========================================================
+  // BUILD
+  // =========================================================
 
   @override
   Widget build(BuildContext context) {
@@ -195,100 +454,90 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       backgroundColor: White,
       body: SafeArea(
         child: _isLoading
-            ? const Center(
-          child: CircularProgressIndicator(
-            color: CardGreen,
-          ),
-        )
+            ? const Center(child: CircularProgressIndicator(color: CardGreen))
             : Column(
-          children: [
-            _buildAppBar(),
+                children: [
+                  _buildAppBar(),
 
-            Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(
-                  20,
-                  16,
-                  20,
-                  20,
-                ),
-                child: Column(
-                  crossAxisAlignment:
-                  CrossAxisAlignment.start,
-                  children: [
-                    Center(
-                      child: _buildAvatar(),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Center(child: _buildAvatar()),
+
+                          const SizedBox(height: 28),
+
+                          // NAME
+                          _buildLabel('Name'),
+
+                          const SizedBox(height: 8),
+
+                          _buildField(
+                            controller: _nameController,
+                            icon: Icons.person_outline,
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // CONTACT
+
+                          _buildLabel('Contact Number'),
+
+
+                          const SizedBox(height: 8),
+
+                          _buildField(
+                            controller: _contactController,
+                            icon: Icons.call_outlined,
+                            keyboardType: TextInputType.phone,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(10),
+                            ],
+
+                          ),
+
+                          const SizedBox(height: 18),
+
+                          // ADDRESS
+                          _buildLabel('Home Address'),
+
+                          const SizedBox(height: 8),
+
+                          _buildField(
+                            controller: _addressController,
+                            icon: Icons.location_on_outlined,
+                            maxLines: 3,
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
 
-                    const SizedBox(height: 28),
-
-                    _buildLabel('Name'),
-
-                    const SizedBox(height: 8),
-
-                    _buildField(
-                      controller: _nameController,
-                      icon: Icons.person_outline,
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    _buildLabel('Contact Number'),
-
-                    const SizedBox(height: 8),
-
-                    _buildField(
-                      controller: _contactController,
-                      icon: Icons.call_outlined,
-                      keyboardType: TextInputType.phone,
-                    ),
-
-                    const SizedBox(height: 18),
-
-                    _buildLabel('Home Address'),
-
-                    const SizedBox(height: 8),
-
-                    _buildField(
-                      controller: _addressController,
-                      icon: Icons.location_on_outlined,
-                    ),
-                  ],
-                ),
+                  _buildUpdateButton(),
+                ],
               ),
-            ),
-
-            _buildUpdateButton(),
-          ],
-        ),
       ),
     );
   }
 
-  // --------------------------------------------------
+  // =========================================================
   // APP BAR
-  // --------------------------------------------------
+  // =========================================================
 
   Widget _buildAppBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        12,
-        8,
-        20,
-        8,
-      ),
+      padding: const EdgeInsets.fromLTRB(12, 8, 20, 8),
       child: Row(
         children: [
           IconButton(
             onPressed: () {
               Navigator.of(context).maybePop();
             },
-            icon: const Icon(
-              Icons.arrow_back,
-              color: Black,
-              size: 22,
-            ),
+            icon: const Icon(Icons.arrow_back, color: Black, size: 22),
           ),
 
           const SizedBox(width: 4),
@@ -306,9 +555,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --------------------------------------------------
+  // =========================================================
   // AVATAR
-  // --------------------------------------------------
+  // =========================================================
 
   Widget _buildAvatar() {
     return SizedBox(
@@ -317,12 +566,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: Stack(
         clipBehavior: Clip.none,
         children: [
-          const CircleAvatar(
-            radius: 46,
-            backgroundColor: White,
-            backgroundImage: AssetImage(
-              'assets/profile_image.png',
+          Container(
+            width: 92,
+            height: 92,
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: White,
             ),
+            child: ClipOval(child: _buildProfileImage()),
           ),
 
           Positioned(
@@ -330,39 +581,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             bottom: 2,
             child: InkWell(
               borderRadius: BorderRadius.circular(30),
-              onTap: () {
-                showModalBottomSheet(
-                  context: context,
-                  backgroundColor: Colors.transparent,
-                  isScrollControlled: true,
-                  builder: (_) {
-                    return ImagePickerBottomSheet(
-                      onGalleryTap: () {
-                        Navigator.pop(context);
-                        // Gallery action
-                      },
-                      onCameraTap: () {
-                        Navigator.pop(context);
-                        // Camera action
-                      },
-                      onRemoveTap: () {
-                        Navigator.pop(context);
-                        // Remove image action
-                      },
-                    );
-                  },
-                );
-              },
+              onTap: _showImagePicker,
               child: Container(
                 width: 28,
                 height: 28,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: CardGreen,
-                  border: Border.all(
-                    color: Colors.white,
-                    width: 2,
-                  ),
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
                 child: const Icon(
                   Icons.camera_alt_outlined,
@@ -377,10 +603,83 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --------------------------------------------------
-  // LABEL
-  // --------------------------------------------------
+  // =========================================================
+  // PROFILE IMAGE
+  // =========================================================
 
+  Widget _buildProfileImage() {
+    // -------------------------------------------------------
+    // SELECTED IMAGE
+    // -------------------------------------------------------
+
+    if (_selectedImageBytes != null) {
+      return Image.memory(
+        _selectedImageBytes!,
+        width: 92,
+        height: 92,
+        fit: BoxFit.cover,
+      );
+    }
+
+    // -------------------------------------------------------
+    // CLOUDINARY IMAGE
+    // -------------------------------------------------------
+
+    if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
+      return Image.network(
+        _profileImageUrl!,
+        width: 92,
+        height: 92,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) {
+          return _defaultProfileImage();
+        },
+      );
+    }
+
+    // -------------------------------------------------------
+    // DEFAULT IMAGE
+    // -------------------------------------------------------
+
+    return _defaultProfileImage();
+  }
+
+  // =========================================================
+  // DEFAULT PROFILE IMAGE
+  // =========================================================
+
+  Widget _defaultProfileImage() {
+    return Image.asset(
+      'assets/profile_image.png',
+      width: 92,
+      height: 92,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) {
+        return const Icon(Icons.person, size: 50, color: Grey);
+      },
+    );
+  }
+
+  // =========================================================
+  // LABEL
+  // =========================================================
+  String? _validateContactNumber(String value) {
+    final phone = value.trim();
+
+    if (phone.isEmpty) {
+      return 'Please enter your contact number';
+    }
+
+    if (!RegExp(r'^[6-9][0-9]{9}$').hasMatch(phone)) {
+      return 'Enter a valid 10-digit mobile number';
+      }
+    if (phone.length != 10) {
+      return 'Enter a valid 10-digit mobile number';
+
+    }
+
+    return null;
+  }
   Widget _buildLabel(String text) {
     return Text(
       text,
@@ -392,33 +691,32 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --------------------------------------------------
-  // FIELD
-  // --------------------------------------------------
+  // =========================================================
+  // TEXT FIELD
+  // =========================================================
 
   Widget _buildField({
     required TextEditingController controller,
     required IconData icon,
     TextInputType keyboardType = TextInputType.text,
+    int maxLines = 1,
+    List<TextInputFormatter>? inputFormatters,
   }) {
     return Container(
-      height: 50,
+      constraints: BoxConstraints(minHeight: maxLines > 1 ? 80 : 50),
       decoration: BoxDecoration(
         color: LightGrey,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: DarkGrey,
-          width: 1,
-        ),
+        border: Border.all(color: DarkGrey, width: 1),
       ),
       child: Row(
+        crossAxisAlignment: maxLines > 1
+            ? CrossAxisAlignment.start
+            : CrossAxisAlignment.center,
         children: [
-          const SizedBox(width: 14),
-
-          Icon(
-            icon,
-            size: 19,
-            color: CardGreen,
+          Padding(
+            padding: EdgeInsets.only(left: 14, top: maxLines > 1 ? 14 : 0),
+            child: Icon(icon, size: 19, color: CardGreen),
           ),
 
           const SizedBox(width: 10),
@@ -427,6 +725,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             child: TextField(
               controller: controller,
               keyboardType: keyboardType,
+              inputFormatters: inputFormatters,
+              maxLines: maxLines,
               style: const TextStyle(
                 color: Grey,
                 fontSize: 14.5,
@@ -435,9 +735,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
               decoration: const InputDecoration(
                 border: InputBorder.none,
                 isDense: true,
-                contentPadding: EdgeInsets.symmetric(
-                  vertical: 14,
-                ),
+                contentPadding: EdgeInsets.symmetric(vertical: 14),
               ),
             ),
           ),
@@ -448,18 +746,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  // --------------------------------------------------
+  // =========================================================
   // UPDATE BUTTON
-  // --------------------------------------------------
+  // =========================================================
 
   Widget _buildUpdateButton() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        20,
-        8,
-        20,
-        16,
-      ),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
       child: SizedBox(
         width: double.infinity,
         height: 52,
@@ -476,20 +769,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ),
           child: _isUpdating
               ? const SizedBox(
-            height: 22,
-            width: 22,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: Colors.white,
-            ),
-          )
+                  height: 22,
+                  width: 22,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
               : const Text(
-            'Update',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+                  'Update',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700),
+                ),
         ),
       ),
     );

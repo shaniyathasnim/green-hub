@@ -1,5 +1,8 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 
 import '../utils/app_colors.dart';
 import '../widgets/custom_text_field.dart';
@@ -20,6 +23,11 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
   final TextEditingController _complaintController = TextEditingController();
 
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  final ImagePicker _imagePicker = ImagePicker();
+  XFile? _selectedImage;
+  Uint8List? _selectedImageBytes;
+
 
   int _currentNavIndex = 2;
   bool _isSubmitting = false;
@@ -55,7 +63,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
     try {
       // Create Complaint document in Firestore
-      await _firestore.collection('Complaint').add({
+      await _firestore.collection('complaints').add({
         'name': name,
         'address': address,
         'complaint': complaint,
@@ -91,6 +99,35 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
           _isSubmitting = false;
         });
       }
+    }
+  }
+  Future<void> _openCamera() async {
+    try {
+      final XFile? image = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        imageQuality: 80,
+      );
+
+      if (image == null) {
+        return;
+      }
+
+      final Uint8List bytes = await image.readAsBytes();
+
+      if (!mounted) return;
+
+      setState(() {
+
+        _selectedImageBytes = bytes;
+      });
+    } catch (e) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to open camera: $e'),
+        ),
+      );
     }
   }
 
@@ -162,7 +199,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               'How Can We Help You Today?',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w200,
+                fontWeight: FontWeight.w600,
                 color: Grey,
               ),
             ),
@@ -173,7 +210,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
               'Please Select An Issue Type Below.',
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.w200,
+                fontWeight: FontWeight.w600,
                 color: Grey,
               ),
             ),
@@ -205,10 +242,12 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
 
             const SizedBox(height: 24),
 
+// Handle upload functionality
+
             AttachmentCard(
-              onUploadPressed: () {
-                // Image picker can be added here later
-              },
+              selectedImageBytes:_selectedImageBytes,
+                onUploadPressed:_openCamera,
+
             ),
 
             const SizedBox(height: 40),
@@ -216,14 +255,7 @@ class _HelpSupportScreenState extends State<HelpSupportScreen> {
         ),
       ),
 
-      bottomNavigationBar: CustomBottomNavigation(
-        currentIndex: _currentNavIndex,
-        onTap: (index) {
-          setState(() {
-            _currentNavIndex = index;
-          });
-        },
-      ),
+
     );
   }
 }

@@ -2,8 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:green_bin/utils/app_colors.dart';
+import 'package:provider/provider.dart';
 
 import '../models/customer_model.dart';
+import '../providers/customer_provider.dart';
 import '../utils/shared_prefs.dart';
 import 'edit_profile_screen.dart';
 
@@ -245,12 +247,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // --------------------------------------------------
 
   Widget _buildAvatar(BuildContext context) {
+    final String? imageUrl =
+    _userData?['profileImageUrl']?.toString();
+
     return SizedBox(
       width: 108,
       height: 108,
       child: Stack(
         clipBehavior: Clip.none,
         children: [
+          // Profile image
           Container(
             width: 108,
             height: 108,
@@ -259,18 +265,59 @@ class _ProfileScreenState extends State<ProfileScreen> {
               shape: BoxShape.circle,
               color: Colors.white.withOpacity(0.15),
             ),
-            child: const CircleAvatar(
-              radius: 51,
-              backgroundColor: Colors.white,
-              backgroundImage: AssetImage(
-                'assets/profile_image.png',
+            child: ClipOval(
+              child: imageUrl != null && imageUrl.isNotEmpty
+                  ? Image.network(
+                imageUrl,
+                width: 100,
+                height: 100,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (context, error, stackTrace) {
+                  return const ColoredBox(
+                    color: Colors.white,
+                    child: Center(
+                      child: Icon(
+                        Icons.person,
+                        size: 60,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  );
+                },
+                loadingBuilder:
+                    (context, child, loadingProgress) {
+                  if (loadingProgress == null) {
+                    return child;
+                  }
+
+                  return const ColoredBox(
+                    color: Colors.white,
+                    child: Center(
+                      child: CircularProgressIndicator(
+                        color: CardGreen,
+                      ),
+                    ),
+                  );
+                },
+              )
+                  : const ColoredBox(
+                color: Colors.white,
+                child: Center(
+                  child: Icon(
+                    Icons.person,
+                    size: 60,
+                    color: Colors.grey,
+                  ),
+                ),
               ),
             ),
           ),
 
+          // Edit button
           Positioned(
-            right: 2,
-            bottom: 2,
+            right: 0,
+            bottom: 0,
             child: InkWell(
               onTap: () async {
                 await Navigator.push(
@@ -281,10 +328,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   ),
                 );
 
-                // IMPORTANT:
-                // Reload Firebase data after returning
-                // from Edit Profile.
-                await _loadProfile();
+                // Reload latest profile data from Firestore
+                if (mounted) {
+                  await _loadProfile();
+                }
               },
               borderRadius: BorderRadius.circular(20),
               child: Container(
@@ -292,8 +339,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 height: 30,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color:
-                  kPrimaryGreen.withOpacity(0.9),
+                  color: kPrimaryGreen.withOpacity(0.9),
                   border: Border.all(
                     color: Colors.white,
                     width: 2,
@@ -355,12 +401,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
           const SizedBox(height: 14),
 
-          _InfoCard(
-            icon: Icons.password,
-            label: 'Password',
-            value: '********',
+          // _InfoCard(
+          //   icon: Icons.password,
+          //   label: 'Password',
+          //   value: '********',
+          //
 
-          ),
+          // ),
 
           const SizedBox(height: 14),
 

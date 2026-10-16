@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../utils/app_colors.dart';
+import '../views/home_page.dart';
 
 class HelpSuccessScreen extends StatelessWidget {
   const HelpSuccessScreen({super.key});
@@ -48,7 +49,8 @@ class HelpSuccessScreen extends StatelessWidget {
                 height: 54,
                 child: ElevatedButton(
                   onPressed: () {
-                    Navigator.popUntil(context, (route) => route.isFirst);
+                    Navigator.push(context, MaterialPageRoute(builder:
+                        (context) => const HomePage ()));
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: CardGreen,
